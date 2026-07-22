@@ -24,12 +24,12 @@ public class BufoWingsLayer extends RenderLayer<BufoEntity, BufoModel> {
     // ---- Tunable placement knobs ----
     private static final float WING_Y = -0.15f;   // moved down ~1/3 height   // up/down on the back (more negative = higher)
     private static final float WING_Z = 0.10f;    // fore/aft (more positive = further back)
-    private static final float WING_SCALE = 1.1f; // overall wing size
+    private static final float WING_SCALE = 1.75f; // overall wing size
     private static final float FLAP_SPEED = 0.55f;
     private static final float FLAP_AMOUNT = 0.9f;
-    private static final float WING_R = 0.78f; // raised to offset the allay texture's blue
-    private static final float WING_G = 0.40f;
-    private static final float WING_B = 0.68f;
+    private static final float WING_R = 0.80f;
+    private static final float WING_G = 0.00f;
+    private static final float WING_B = 0.10f;
     // ----------------------------------
 
     private final ModelPart rightWing;
