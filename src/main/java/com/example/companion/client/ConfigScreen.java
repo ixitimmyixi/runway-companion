@@ -2,6 +2,7 @@ package com.example.companion.client;
 
 import com.example.companion.CompanionConfig;
 import com.example.companion.ai.RunwayTts;
+import com.example.companion.audio.AudioPlayer;
 import com.example.companion.ai.VoicesClient;
 import com.example.companion.audio.MicCapture;
 
@@ -35,6 +36,7 @@ public class ConfigScreen extends Screen {
     private final Map<String, EditBox> boxes = new LinkedHashMap<>();
     private ForgeSlider volumeSlider;
     private String micSelected;
+    private String audioOutSelected;
 
     private List<VoicesClient.Voice> fetchedVoices = new ArrayList<>();
     private String status = "";
@@ -53,6 +55,7 @@ public class ConfigScreen extends Screen {
         super(Component.literal("Runway Companion"));
         this.parent = parent;
         this.micSelected = CompanionConfig.micDeviceName;
+        this.audioOutSelected = CompanionConfig.audioOutputDeviceName;
         hidden.add("LLM API key");
         hidden.add("Runway API key");
         hidden.add("STT API key");
@@ -82,6 +85,18 @@ public class ConfigScreen extends Screen {
                 Component.literal("Volume: "), Component.literal("%"),
                 0, 100, CompanionConfig.ttsVolume, 1, 0, true);
             addRenderableWidget(volumeSlider);
+            y += step + 2;
+
+            List<String> outDevices = new ArrayList<>();
+            outDevices.add("(system default)");
+            outDevices.addAll(AudioPlayer.listOutputDevices());
+            String outInit = (audioOutSelected == null || audioOutSelected.isBlank()) ? outDevices.get(0)
+                : (outDevices.contains(audioOutSelected) ? audioOutSelected : outDevices.get(0));
+            CycleButton<String> outPick = CycleButton.<String>builder(Component::literal)
+                .withValues(outDevices).withInitialValue(outInit)
+                .create(boxX, y, boxW, 18, Component.literal("Output device"),
+                    (btn, val) -> audioOutSelected = val.equals("(system default)") ? "" : val);
+            addRenderableWidget(outPick);
             y += step + 2;
 
             List<String> displayVoices = new ArrayList<>(PRESET_VOICES);
@@ -194,6 +209,7 @@ public class ConfigScreen extends Screen {
         applyKey("STT API key", v -> CompanionConfig.sttApiKey = v);
         if (volumeSlider != null) CompanionConfig.ttsVolume = (int) volumeSlider.getValue();
         if (micSelected != null) CompanionConfig.micDeviceName = micSelected;
+        if (audioOutSelected != null) CompanionConfig.audioOutputDeviceName = audioOutSelected;
     }
 
     private void apply(String key, java.util.function.Consumer<String> setter) {
