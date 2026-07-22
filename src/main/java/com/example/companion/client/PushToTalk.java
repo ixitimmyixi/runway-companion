@@ -4,6 +4,7 @@ import com.example.companion.CompanionConfig;
 import com.example.companion.CompanionMod;
 import com.example.companion.Pipeline;
 import com.example.companion.ai.SttClient;
+import com.example.companion.audio.AudioPlayer;
 import com.example.companion.audio.MicCapture;
 
 import net.minecraft.client.KeyMapping;
@@ -46,6 +47,7 @@ public final class PushToTalk {
 
     private static void startRecording() {
         try {
+            AudioPlayer.stop(); // cut off Bufo's current speech the moment the player talks
             MIC.start(CompanionConfig.micDeviceName);
         } catch (Exception ex) {
             Pipeline.echo("(mic error: " + ex.getMessage() + ")");
