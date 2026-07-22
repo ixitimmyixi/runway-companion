@@ -55,3 +55,71 @@ public final class RunwayTts {
             if (CompanionConfig.ttsReferenceUrl != null && !CompanionConfig.ttsReferenceUrl.isBlank()) {
                 audioUri = CompanionConfig.ttsReferenceUrl.trim();
             } else {
+                String previewUrl = VoicesClient.previewUrlFor(v);
+                if (previewUrl == null || previewUrl.isBlank()) {
+                    throw new RuntimeException("No preview clip found for custom voice \"" + v + "\". Make sure it's "
+                        + "READY on your Runway account, set ttsReferenceUrl to a <=30s clip, or pick a preset voice.");
+                }
+                audioUri = ReferenceClip.dataUriFromPreview(previewUrl);
+            }
+            body.addProperty("model", "seed_audio");
+            JsonObject voice = new JsonObject();
+            voice.addProperty("type", "reference-audio");
+            voice.addProperty("audioUri", audioUri);
+            body.add("voice", voice);
+            body.addProperty("outputFormat", "mp3");
+        }
+
+        HttpRequest create = HttpRequest.newBuilder()
+            .uri(URI.create(BASE + "/v1/text_to_speech"))
+            .timeout(Duration.ofSeconds(30))
+            .header("Content-Type", "application/json")
+            .header("Authorization", "Bearer " + CompanionConfig.runwayApiKey)
+            .header("X-Runway-Version", VERSION)
+            .POST(HttpRequest.BodyPublishers.ofString(body.toString()))
+            .build();
+
+        HttpResponse<String> res = HTTP.send(create, HttpResponse.BodyHandlers.ofString());
+        if (res.statusCode() / 100 != 2)
+            throw new RuntimeException("TTS create HTTP " + res.statusCode() + ": " + res.body());
+
+        JsonObject created = JsonParser.parseString(res.body()).getAsJsonObject();
+        String taskId = created.get("id").getAsString();
+
+        String outputUrl = null;
+        long deadline = System.currentTimeMillis() + 60_000;
+        while (System.currentTimeMillis() < deadline) {
+            Thread.sleep(1000);
+            HttpRequest poll = HttpRequest.newBuilder()
+                .uri(URI.create(BASE + "/v1/tasks/" + taskId))
+                .timeout(Duration.ofSeconds(30))
+                .header("Authorization", "Bearer " + CompanionConfig.runwayApiKey)
+                .header("X-Runway-Version", VERSION)
+                .GET().build();
+            HttpResponse<String> pr = HTTP.send(poll, HttpResponse.BodyHandlers.ofString());
+            if (pr.statusCode() / 100 != 2)
+                throw new RuntimeException("TTS poll HTTP " + pr.statusCode() + ": " + pr.body());
+
+            JsonObject task = JsonParser.parseString(pr.body()).getAsJsonObject();
+            String status = task.get("status").getAsString();
+            if ("SUCCEEDED".equals(status)) {
+                JsonArray output = task.getAsJsonArray("output");
+                if (output != null && output.size() > 0) outputUrl = output.get(0).getAsString();
+                break;
+            } else if ("FAILED".equals(status)) {
+                throw new RuntimeException("TTS task failed: " + pr.body());
+            }
+        }
+        if (outputUrl == null) throw new RuntimeException("TTS timed out or returned no output");
+
+        HttpRequest dl = HttpRequest.newBuilder()
+            .uri(URI.create(outputUrl)).timeout(Duration.ofSeconds(30)).GET().build();
+        HttpResponse<InputStream> dlr = HTTP.send(dl, HttpResponse.BodyHandlers.ofInputStream());
+        if (dlr.statusCode() / 100 != 2)
+            throw new RuntimeException("TTS download HTTP " + dlr.statusCode());
+        try (InputStream in = dlr.body(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+            in.transferTo(out);
+            return out.toByteArray();
+        }
+    }
+}
