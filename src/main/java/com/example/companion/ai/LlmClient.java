@@ -40,6 +40,7 @@ public final class LlmClient {
             + "\n- Do NOT narrate the world, time of day, coordinates, health, or biome unless the player asks"
             + " or it's directly relevant to what they just said. Treat that info as background, not something to recite."
             + "\n- Just talk \u2014 no bullet points or lists."
+            + "\n- Your words are read aloud, so phrase numbers for speech: say \"2 by 2\" not \"2x2\", and read coordinates naturally like \"x 120, y 64, z negative 500\" \u2014 no symbols, colons, or brackets."
             + "\n\nAccuracy:"
             + "\n- This is Minecraft " + MC_VERSION + ". Only give advice correct for that version."
             + "\n- Only say what you're sure of. You don't know the world seed or where anything is unless told;"
