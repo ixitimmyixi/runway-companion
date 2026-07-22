@@ -14,6 +14,10 @@ import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.Set;
 
+/**
+ * Runway text-to-speech. Preset voices use eleven_multilingual_v2; a custom
+ * voice is spoken via seed_audio, cloning a <=30s reference clip.
+ */
 public final class RunwayTts {
     private static final HttpClient HTTP = HttpClient.newBuilder()
         .connectTimeout(Duration.ofSeconds(10)).build();
@@ -21,6 +25,7 @@ public final class RunwayTts {
     private static final String BASE = "https://api.dev.runwayml.com";
     private static final String VERSION = "2024-11-06";
 
+    // Preset voices accepted by eleven_multilingual_v2.
     private static final Set<String> PRESETS = Set.of(
         "Maya","Arjun","Serene","Bernard","Billy","Mark","Clint","Mabel","Chad","Leslie",
         "Eleanor","Elias","Elliot","Grungle","Brodie","Sandra","Kirk","Kylie","Lara","Lisa",
@@ -43,16 +48,19 @@ public final class RunwayTts {
             voice.addProperty("presetId", v);
             body.add("voice", voice);
         } else {
-            String previewUrl = VoicesClient.previewUrlFor(v);
-            if (previewUrl == null || previewUrl.isBlank()) {
-                throw new RuntimeException("Couldn't find a preview clip for custom voice \"" + v + "\". "
-                    + "Custom voices are spoken by cloning their preview clip \u2014 make sure the voice exists "
-                    + "and is READY on your Runway account, or pick a preset voice in the config.");
+            // seed_audio requires a reference clip of AT MOST 30 seconds. A custom voice's
+            // preview is often longer, so prefer an explicit short clip if one is configured.
+            String ref = (CompanionConfig.ttsReferenceUrl != null && !CompanionConfig.ttsReferenceUrl.isBlank())
+                ? CompanionConfig.ttsReferenceUrl.trim()
+                : VoicesClient.previewUrlFor(v);
+            if (ref == null || ref.isBlank()) {
+                throw new RuntimeException("No reference clip for custom voice \"" + v + "\". Set ttsReferenceUrl "
+                    + "to a public HTTPS clip of the voice (at most 30 seconds), or pick a preset voice.");
             }
             body.addProperty("model", "seed_audio");
             JsonObject voice = new JsonObject();
             voice.addProperty("type", "reference-audio");
-            voice.addProperty("audioUri", previewUrl);
+            voice.addProperty("audioUri", ref);
             body.add("voice", voice);
             body.addProperty("outputFormat", "mp3");
         }
