@@ -73,7 +73,7 @@ public class BufoEntity extends Animal implements FlyingAnimal {
         return true;
     }
 
-    private static final double MAX_ABOVE_PLAYER = 1.6;
+    private static final double MAX_ABOVE_PLAYER = 1.6; // how high above the player's feet Bufo may drift
 
     @Override
     public void tick() {
@@ -115,6 +115,7 @@ public class BufoEntity extends Animal implements FlyingAnimal {
                 level().addParticle(ParticleTypes.NOTE, px, py, pz, this.random.nextDouble(), 0.0, 0.0);
             }
         }
+    }
 
     @Override
     public boolean isFood(ItemStack stack) {
