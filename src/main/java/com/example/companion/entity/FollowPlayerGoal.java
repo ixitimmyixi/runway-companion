@@ -8,17 +8,13 @@ import net.minecraft.world.level.Level;
 
 import java.util.EnumSet;
 
-/**
- * Bufo walks to the nearest player when they get too far and stops when close.
- * If he falls a long way behind (sprinting, boats, etc.) he teleports to catch up.
- */
 public class FollowPlayerGoal extends Goal {
     private final BufoEntity bufo;
     private final PathNavigation nav;
     private final double speed;
     private final float startDist;
     private final float stopDist;
-    private static final float TELEPORT_DIST = 18.0f;
+    private static final float TELEPORT_DIST = 12.0f;
     private Player target;
     private int recalc;
 
@@ -67,19 +63,17 @@ public class FollowPlayerGoal extends Goal {
         }
         if (--this.recalc <= 0) {
             this.recalc = 10;
-            this.nav.moveTo(target, this.speed);
+            this.nav.moveTo(target.getX(), target.getEyeY() + 0.4, target.getZ(), this.speed);
         }
     }
 
     private boolean tryTeleport() {
-        BlockPos base = target.blockPosition();
         for (int i = 0; i < 10; i++) {
-            int dx = randRange(-2, 2);
-            int dy = randRange(-1, 1);
-            int dz = randRange(-2, 2);
-            BlockPos pos = base.offset(dx, dy, dz);
-            if (canStandAt(pos)) {
-                bufo.moveTo(pos.getX() + 0.5, pos.getY(), pos.getZ() + 0.5, bufo.getYRot(), bufo.getXRot());
+            double x = target.getX() + randD(-1.5, 1.5);
+            double y = target.getEyeY() + randD(0.0, 1.5);
+            double z = target.getZ() + randD(-1.5, 1.5);
+            if (isClear(BlockPos.containing(x, y, z))) {
+                bufo.moveTo(x, y, z, bufo.getYRot(), bufo.getXRot());
                 this.nav.stop();
                 return true;
             }
@@ -87,16 +81,12 @@ public class FollowPlayerGoal extends Goal {
         return false;
     }
 
-    private int randRange(int min, int max) {
-        return min + bufo.getRandom().nextInt(max - min + 1);
+    private double randD(double min, double max) {
+        return min + bufo.getRandom().nextDouble() * (max - min);
     }
 
-    private boolean canStandAt(BlockPos pos) {
+    private boolean isClear(BlockPos pos) {
         Level lvl = bufo.level();
-        boolean supported = !lvl.getBlockState(pos.below()).getCollisionShape(lvl, pos.below()).isEmpty()
-            || !lvl.getFluidState(pos.below()).isEmpty();
-        boolean feetClear = lvl.getBlockState(pos).getCollisionShape(lvl, pos).isEmpty();
-        boolean headClear = lvl.getBlockState(pos.above()).getCollisionShape(lvl, pos.above()).isEmpty();
-        return supported && feetClear && headClear;
+        return lvl.getBlockState(pos).getCollisionShape(lvl, pos).isEmpty();
     }
 }
