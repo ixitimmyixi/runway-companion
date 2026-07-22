@@ -73,7 +73,7 @@ public class BufoEntity extends Animal implements FlyingAnimal {
         return true;
     }
 
-    private static final double MAX_ABOVE_PLAYER = 2.5;
+    private static final double MAX_ABOVE_PLAYER = 1.6;
 
     @Override
     public void tick() {
@@ -84,7 +84,7 @@ public class BufoEntity extends Animal implements FlyingAnimal {
                 double dsq = this.distanceToSqr(p);
                 if (dsq > 24.0 * 24.0) {
                     // Player jumped away (e.g. /tp, ender pearl) -> snap to them.
-                    this.moveTo(p.getX(), p.getEyeY() + 0.4, p.getZ(), this.getYRot(), this.getXRot());
+                    this.moveTo(p.getX(), p.getY() + 1.1, p.getZ(), this.getYRot(), this.getXRot());
                     this.setDeltaMovement(0.0, 0.0, 0.0);
                     this.getNavigation().stop();
                 } else if (this.getY() > p.getY() + MAX_ABOVE_PLAYER) {
