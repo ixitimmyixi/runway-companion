@@ -6,6 +6,7 @@ import com.mojang.blaze3d.vertex.PoseStack;
 import net.minecraft.client.model.geom.ModelLayers;
 import net.minecraft.client.renderer.entity.EntityRendererProvider;
 import net.minecraft.client.renderer.entity.MobRenderer;
+import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.Mth;
 
@@ -33,6 +34,11 @@ public class BufoRenderer extends MobRenderer<BufoEntity, BufoModel> {
             s *= 1.0f + 0.08f * Mth.sin((entity.tickCount + partialTick) * 0.6f);
         }
         pose.scale(s, s, s);
+    }
+
+    @Override
+    protected int getBlockLightLevel(BufoEntity entity, BlockPos pos) {
+        return 15; // emissive: Bufo self-glows instead of being darkened by ambient light
     }
 
     @Override
