@@ -22,12 +22,11 @@ import org.jetbrains.annotations.Nullable;
 
 /** Bufo the companion: floats and hovers near the player like an Allay (Navi-style). */
 public class BufoEntity extends Animal implements FlyingAnimal {
-    private static final double MAX_ABOVE_PLAYER = 2.5;
-
     public BufoEntity(EntityType<? extends Animal> type, Level level) {
         super(type, level);
         this.moveControl = new FlyingMoveControl(this, 20, true);
         this.setNoGravity(true);
+        this.setInvulnerable(true);
     }
 
     @Override
@@ -65,14 +64,34 @@ public class BufoEntity extends Animal implements FlyingAnimal {
     }
 
     @Override
+    public boolean hurt(DamageSource source, float amount) {
+        return false; // Bufo can't be hurt
+    }
+
+    @Override
+    public boolean isInvulnerableTo(DamageSource source) {
+        return true;
+    }
+
+    private static final double MAX_ABOVE_PLAYER = 2.5;
+
+    @Override
     public void tick() {
         super.tick();
         if (!level().isClientSide) {
-            Player p = level().getNearestPlayer(this, 32.0);
-            if (p != null && this.getY() > p.getY() + MAX_ABOVE_PLAYER) {
-                this.setPos(this.getX(), p.getY() + MAX_ABOVE_PLAYER, this.getZ());
-                var v = this.getDeltaMovement();
-                if (v.y > 0) this.setDeltaMovement(v.x, 0.0, v.z);
+            Player p = level().getNearestPlayer(this, -1.0); // no range limit -> can follow long teleports
+            if (p != null) {
+                double dsq = this.distanceToSqr(p);
+                if (dsq > 24.0 * 24.0) {
+                    // Player jumped away (e.g. /tp, ender pearl) -> snap to them.
+                    this.moveTo(p.getX(), p.getEyeY() + 0.4, p.getZ(), this.getYRot(), this.getXRot());
+                    this.setDeltaMovement(0.0, 0.0, 0.0);
+                    this.getNavigation().stop();
+                } else if (this.getY() > p.getY() + MAX_ABOVE_PLAYER) {
+                    this.setPos(this.getX(), p.getY() + MAX_ABOVE_PLAYER, this.getZ());
+                    var v = this.getDeltaMovement();
+                    if (v.y > 0) this.setDeltaMovement(v.x, 0.0, v.z);
+                }
             }
         }
         if (level().isClientSide
