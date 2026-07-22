@@ -161,10 +161,40 @@ public final class RunwayTts {
         return cachedUri;
     }
 
-    /** Make text read better aloud (e.g. "2x2" -> "2 by 2", "5x5x5" -> "5 by 5 by 5"). */
+/** Make text read better aloud: "2x2" -> "2 by 2"; coordinate triples get a spoken
+     *  "coordinates" prefix; and a leading minus sign becomes the word "negative". */
     private static String speakable(String text) {
         if (text == null) return "";
-        return text.replaceAll("(?<=\\d)\\s*[xX]\\s*(?=\\d)", " by ");
+        String t = text;
+
+        // "2x2", "16 x 16", "5x5x5" -> spoken "by"
+        t = t.replaceAll("(?<=\\d)\\s*[xX]\\s*(?=\\d)", " by ");
+
+        // Coordinate triples: "-1247, 69, 3648" -> "coordinates negative 1247, 69, 3648"
+        java.util.regex.Matcher m = java.util.regex.Pattern
+            .compile("(-?\\d+)\\s*,\\s*(-?\\d+)\\s*,\\s*(-?\\d+)").matcher(t);
+        StringBuffer sb = new StringBuffer();
+        while (m.find()) {
+            String g1 = m.group(1), g2 = m.group(2), g3 = m.group(3);
+            boolean coordLike = g1.startsWith("-") || g2.startsWith("-") || g3.startsWith("-")
+                || g1.replace("-", "").length() >= 2
+                || g2.replace("-", "").length() >= 2
+                || g3.replace("-", "").length() >= 2;
+            String rep = coordLike
+                ? "coordinates " + sign(g1) + ", " + sign(g2) + ", " + sign(g3)
+                : m.group(0); // a plain small list, leave it alone
+            m.appendReplacement(sb, java.util.regex.Matcher.quoteReplacement(rep));
+        }
+        m.appendTail(sb);
+        t = sb.toString();
+
+        // Any remaining standalone negative number (not part of a range like 10-20): "-500" -> "negative 500"
+        t = t.replaceAll("(?<![\\w\\d])-(\\d)", "negative $1");
+        return t;
+    }
+
+    private static String sign(String num) {
+        return num.startsWith("-") ? "negative " + num.substring(1) : num;
     }
 
     /** Pre-build + upload the reference off the game thread so the first line isn't slow. */
