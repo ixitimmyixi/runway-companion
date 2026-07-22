@@ -48,73 +48,10 @@ public final class RunwayTts {
             voice.addProperty("presetId", v);
             body.add("voice", voice);
         } else {
-            // seed_audio requires a reference clip of AT MOST 30 seconds. A custom voice's
-            // preview is often longer, so prefer an explicit short clip if one is configured.
-            String ref = (CompanionConfig.ttsReferenceUrl != null && !CompanionConfig.ttsReferenceUrl.isBlank())
-                ? CompanionConfig.ttsReferenceUrl.trim()
-                : VoicesClient.previewUrlFor(v);
-            if (ref == null || ref.isBlank()) {
-                throw new RuntimeException("No reference clip for custom voice \"" + v + "\". Set ttsReferenceUrl "
-                    + "to a public HTTPS clip of the voice (at most 30 seconds), or pick a preset voice.");
-            }
-            body.addProperty("model", "seed_audio");
-            JsonObject voice = new JsonObject();
-            voice.addProperty("type", "reference-audio");
-            voice.addProperty("audioUri", ref);
-            body.add("voice", voice);
-            body.addProperty("outputFormat", "mp3");
-        }
-
-        HttpRequest create = HttpRequest.newBuilder()
-            .uri(URI.create(BASE + "/v1/text_to_speech"))
-            .timeout(Duration.ofSeconds(30))
-            .header("Content-Type", "application/json")
-            .header("Authorization", "Bearer " + CompanionConfig.runwayApiKey)
-            .header("X-Runway-Version", VERSION)
-            .POST(HttpRequest.BodyPublishers.ofString(body.toString()))
-            .build();
-
-        HttpResponse<String> res = HTTP.send(create, HttpResponse.BodyHandlers.ofString());
-        if (res.statusCode() / 100 != 2)
-            throw new RuntimeException("TTS create HTTP " + res.statusCode() + ": " + res.body());
-
-        JsonObject created = JsonParser.parseString(res.body()).getAsJsonObject();
-        String taskId = created.get("id").getAsString();
-
-        String outputUrl = null;
-        long deadline = System.currentTimeMillis() + 60_000;
-        while (System.currentTimeMillis() < deadline) {
-            Thread.sleep(1000);
-            HttpRequest poll = HttpRequest.newBuilder()
-                .uri(URI.create(BASE + "/v1/tasks/" + taskId))
-                .timeout(Duration.ofSeconds(30))
-                .header("Authorization", "Bearer " + CompanionConfig.runwayApiKey)
-                .header("X-Runway-Version", VERSION)
-                .GET().build();
-            HttpResponse<String> pr = HTTP.send(poll, HttpResponse.BodyHandlers.ofString());
-            if (pr.statusCode() / 100 != 2)
-                throw new RuntimeException("TTS poll HTTP " + pr.statusCode() + ": " + pr.body());
-
-            JsonObject task = JsonParser.parseString(pr.body()).getAsJsonObject();
-            String status = task.get("status").getAsString();
-            if ("SUCCEEDED".equals(status)) {
-                JsonArray output = task.getAsJsonArray("output");
-                if (output != null && output.size() > 0) outputUrl = output.get(0).getAsString();
-                break;
-            } else if ("FAILED".equals(status)) {
-                throw new RuntimeException("TTS task failed: " + pr.body());
-            }
-        }
-        if (outputUrl == null) throw new RuntimeException("TTS timed out or returned no output");
-
-        HttpRequest dl = HttpRequest.newBuilder()
-            .uri(URI.create(outputUrl)).timeout(Duration.ofSeconds(30)).GET().build();
-        HttpResponse<InputStream> dlr = HTTP.send(dl, HttpResponse.BodyHandlers.ofInputStream());
-        if (dlr.statusCode() / 100 != 2)
-            throw new RuntimeException("TTS download HTTP " + dlr.statusCode());
-        try (InputStream in = dlr.body(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
-            in.transferTo(out);
-            return out.toByteArray();
-        }
-    }
-}
+            // seed_audio requires a reference clip of AT MOST 30 seconds. If the user hosts
+            // their own short clip we use it directly; otherwise we download the voice's
+            // preview and trim it to <30s inline (as a data: URI) so nothing needs hosting.
+            String audioUri;
+            if (CompanionConfig.ttsReferenceUrl != null && !CompanionConfig.ttsReferenceUrl.isBlank()) {
+                audioUri = CompanionConfig.ttsReferenceUrl.trim();
+            } else {
