@@ -8,6 +8,7 @@ import net.minecraft.world.level.Level;
 
 import java.util.EnumSet;
 
+/** Bufo hovers near the player's head; flies toward it when far, teleports if left far behind. */
 public class FollowPlayerGoal extends Goal {
     private final BufoEntity bufo;
     private final PathNavigation nav;
@@ -15,6 +16,7 @@ public class FollowPlayerGoal extends Goal {
     private final float startDist;
     private final float stopDist;
     private static final float TELEPORT_DIST = 12.0f;
+    private static final double HOVER_ABOVE_FEET = 1.1; // ~shoulder height; raise to float higher
     private Player target;
     private int recalc;
 
@@ -63,14 +65,14 @@ public class FollowPlayerGoal extends Goal {
         }
         if (--this.recalc <= 0) {
             this.recalc = 10;
-            this.nav.moveTo(target.getX(), target.getEyeY() + 0.4, target.getZ(), this.speed);
+            this.nav.moveTo(target.getX(), target.getY() + HOVER_ABOVE_FEET, target.getZ(), this.speed);
         }
     }
 
     private boolean tryTeleport() {
         for (int i = 0; i < 10; i++) {
             double x = target.getX() + randD(-1.5, 1.5);
-            double y = target.getEyeY() + randD(0.0, 1.5);
+            double y = target.getY() + randD(0.6, 1.4);
             double z = target.getZ() + randD(-1.5, 1.5);
             if (isClear(BlockPos.containing(x, y, z))) {
                 bufo.moveTo(x, y, z, bufo.getYRot(), bufo.getXRot());
