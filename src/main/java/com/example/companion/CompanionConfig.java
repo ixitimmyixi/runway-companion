@@ -24,6 +24,7 @@ public final class CompanionConfig {
     public static String runwayApiKey  = "";
     public static String ttsModel      = "eleven_multilingual_v2";
     public static String ttsVoice      = "";
+    public static String ttsReferenceUrl = "";  // <=30s HTTPS clip for custom (seed_audio) voices
     public static int    ttsVolume     = 100;   // 0-100
 
     // Voice input (speech-to-text). Defaults to Groq's free OpenAI-compatible Whisper.
@@ -54,6 +55,7 @@ public final class CompanionConfig {
             runwayApiKey  = p.getProperty("runwayApiKey", runwayApiKey);
             ttsModel      = p.getProperty("ttsModel", ttsModel);
             ttsVoice      = p.getProperty("ttsVoice", ttsVoice);
+            ttsReferenceUrl = p.getProperty("ttsReferenceUrl", ttsReferenceUrl);
             try { ttsVolume = Integer.parseInt(p.getProperty("ttsVolume", String.valueOf(ttsVolume))); } catch (NumberFormatException ignored) {}
             sttBaseUrl    = p.getProperty("sttBaseUrl", sttBaseUrl);
             sttModel      = p.getProperty("sttModel", sttModel);
@@ -77,6 +79,7 @@ public final class CompanionConfig {
         p.setProperty("runwayApiKey", runwayApiKey);
         p.setProperty("ttsModel", ttsModel);
         p.setProperty("ttsVoice", ttsVoice);
+        p.setProperty("ttsReferenceUrl", ttsReferenceUrl);
         p.setProperty("ttsVolume", String.valueOf(ttsVolume));
         p.setProperty("sttBaseUrl", sttBaseUrl);
         p.setProperty("sttModel", sttModel);
