@@ -29,7 +29,7 @@ public class BufoWingsLayer extends RenderLayer<BufoEntity, BufoModel> {
     private static final float FLAP_AMOUNT = 0.9f;
     private static final float WING_R = 0.80f;
     private static final float WING_G = 0.00f;
-    private static final float WING_B = 0.10f;
+    private static final float WING_B = 0.30f;
     // ----------------------------------
 
     private final ModelPart rightWing;
