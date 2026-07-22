@@ -46,6 +46,7 @@ public final class RunwayTts {
     private RunwayTts() {}
 
     public static byte[] synthesize(String text) throws Exception {
+        text = speakable(text);
         String v = CompanionConfig.ttsVoice == null ? "" : CompanionConfig.ttsVoice.trim();
 
         JsonObject body = new JsonObject();
@@ -59,8 +60,10 @@ public final class RunwayTts {
             voice.addProperty("presetId", v);
             body.add("voice", voice);
         } else {
-            // Custom voice path via seed_audio. The reference clip must be <=30s; we build
-            // it from the voice's preview, upload it once, and reuse a tiny runway:// URI.
+            // Custom voice path: clone the voice's preview clip via seed_audio.
+            // seed_audio requires a reference clip of AT MOST 30 seconds. If the user hosts
+            // their own short clip we use it directly; otherwise we download the voice's
+            // preview and trim it to <30s inline (as a data: URI) so nothing needs hosting.
             String audioUri = referenceFor(v);
             body.addProperty("model", "seed_audio");
             JsonObject voice = new JsonObject();
@@ -156,6 +159,12 @@ public final class RunwayTts {
             }
         }
         return cachedUri;
+    }
+
+    /** Make text read better aloud (e.g. "2x2" -> "2 by 2", "5x5x5" -> "5 by 5 by 5"). */
+    private static String speakable(String text) {
+        if (text == null) return "";
+        return text.replaceAll("(?<=\\d)\\s*[xX]\\s*(?=\\d)", " by ");
     }
 
     /** Pre-build + upload the reference off the game thread so the first line isn't slow. */
