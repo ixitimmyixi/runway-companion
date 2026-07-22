@@ -94,26 +94,13 @@ public class BufoEntity extends Animal implements FlyingAnimal {
                 }
             }
         }
-        if (level().isClientSide) {
-            // Soft glowing halo: a slowly rotating ring of end-rod glints above Bufo's head.
-            double haloY = getY() + 0.95;
-            double radius = 0.32;
-            int points = 4;
-            double base = (this.tickCount % 60) / 60.0 * Math.PI * 2.0;
-            for (int i = 0; i < points; i++) {
-                double ang = base + i * (Math.PI * 2.0 / points);
-                double hx = getX() + Math.cos(ang) * radius;
-                double hz = getZ() + Math.sin(ang) * radius;
-                level().addParticle(ParticleTypes.END_ROD, hx, haloY, hz, 0.0, 0.0, 0.0);
-            }
-
-            // Note particles while speaking (kept from before).
-            if (com.example.companion.client.BufoSpeakingState.isSpeaking() && this.random.nextInt(4) == 0) {
-                double px = getX() + (this.random.nextDouble() - 0.5) * 0.4;
-                double py = getY() + 0.8;
-                double pz = getZ() + (this.random.nextDouble() - 0.5) * 0.4;
-                level().addParticle(ParticleTypes.NOTE, px, py, pz, this.random.nextDouble(), 0.0, 0.0);
-            }
+        if (level().isClientSide
+                && com.example.companion.client.BufoSpeakingState.isSpeaking()
+                && this.random.nextInt(4) == 0) {
+            double px = getX() + (this.random.nextDouble() - 0.5) * 0.4;
+            double py = getY() + 0.8;
+            double pz = getZ() + (this.random.nextDouble() - 0.5) * 0.4;
+            level().addParticle(ParticleTypes.NOTE, px, py, pz, this.random.nextDouble(), 0.0, 0.0);
         }
     }
 
