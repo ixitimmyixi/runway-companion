@@ -80,3 +80,19 @@ public class BufoEntity extends Animal implements FlyingAnimal {
                 && this.random.nextInt(4) == 0) {
             double px = getX() + (this.random.nextDouble() - 0.5) * 0.4;
             double py = getY() + 0.8;
+            double pz = getZ() + (this.random.nextDouble() - 0.5) * 0.4;
+            level().addParticle(ParticleTypes.NOTE, px, py, pz, this.random.nextDouble(), 0.0, 0.0);
+        }
+    }
+
+    @Override
+    public boolean isFood(ItemStack stack) {
+        return false;
+    }
+
+    @Nullable
+    @Override
+    public AgeableMob getBreedOffspring(ServerLevel level, AgeableMob partner) {
+        return null;
+    }
+}
