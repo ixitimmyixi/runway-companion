@@ -26,7 +26,7 @@ public class BufoRenderer extends MobRenderer<BufoEntity, BufoModel> {
 
     // ---- Radiant aura tunables ----
     private static final float GLOW_Y      = 0.45f;  // height of the glow's center (blocks above feet)
-    private static final float GLOW_RADIUS = 0.60f;  // how far the light reaches out
+    private static final float GLOW_RADIUS = 1.20f;  // how far the light reaches out
     private static final int   GLOW_SEG    = 32;     // smoothness of the disc
     // Warm gold, RGB 0-1. Core alpha = brightness at center; edges fade to 0 (feathered).
     private static final float GLOW_R = 1.00f, GLOW_G = 0.80f, GLOW_B = 0.35f;
