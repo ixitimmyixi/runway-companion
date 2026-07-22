@@ -90,7 +90,7 @@ public final class RunwayTts {
         long deadline = System.currentTimeMillis() + 60_000;
         boolean firstPoll = true;
         while (System.currentTimeMillis() < deadline) {
-            Thread.sleep(firstPoll ? 300 : 500);
+            Thread.sleep(firstPoll ? 250 : 300);
             firstPoll = false;
             HttpRequest poll = HttpRequest.newBuilder()
                 .uri(URI.create(BASE + "/v1/tasks/" + taskId))
