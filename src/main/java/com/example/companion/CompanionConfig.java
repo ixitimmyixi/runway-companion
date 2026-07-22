@@ -32,6 +32,7 @@ public final class CompanionConfig {
     public static String sttModel      = "whisper-large-v3-turbo";
     public static String sttApiKey     = "";
     public static String micDeviceName = "";     // empty = system default input
+    public static String audioOutputDeviceName = ""; // empty = system default output
 
     // Web search (Brave Search API). Blank = web search disabled (wiki still works).
     public static String webSearchApiKey = "";
@@ -61,6 +62,7 @@ public final class CompanionConfig {
             sttModel      = p.getProperty("sttModel", sttModel);
             sttApiKey     = p.getProperty("sttApiKey", sttApiKey);
             micDeviceName = p.getProperty("micDeviceName", micDeviceName);
+            audioOutputDeviceName = p.getProperty("audioOutputDeviceName", audioOutputDeviceName);
             webSearchApiKey = p.getProperty("webSearchApiKey", webSearchApiKey);
         } catch (IOException e) {
             System.err.println("[companion] failed to read config: " + e.getMessage());
@@ -85,6 +87,7 @@ public final class CompanionConfig {
         p.setProperty("sttModel", sttModel);
         p.setProperty("sttApiKey", sttApiKey);
         p.setProperty("micDeviceName", micDeviceName);
+        p.setProperty("audioOutputDeviceName", audioOutputDeviceName);
         p.setProperty("webSearchApiKey", webSearchApiKey);
         try {
             Files.createDirectories(file().getParent());
