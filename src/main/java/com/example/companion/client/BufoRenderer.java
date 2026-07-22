@@ -14,7 +14,7 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.Mth;
 import org.joml.Matrix4f;
 
-/** Swamp-skinned librarian villager, ~0.45x, with Allay wings, a glow, and a golden halo. */
+/** Swamp-skinned librarian villager, ~0.45x, with Allay wings, a glow, and a radiant aura. */
 public class BufoRenderer extends MobRenderer<BufoEntity, BufoModel> {
     private static final ResourceLocation BASE =
         new ResourceLocation("minecraft", "textures/entity/villager/villager.png");
@@ -24,14 +24,13 @@ public class BufoRenderer extends MobRenderer<BufoEntity, BufoModel> {
         new ResourceLocation("minecraft", "textures/entity/villager/profession/librarian.png");
     private static final float BASE_SCALE = 0.45f;
 
-    // ---- Halo tunables (blocks) ----
-    private static final float HALO_Y      = 0.95f;  // height above the player-visible feet
-    private static final float HALO_R_IN   = 0.16f;  // inner radius
-    private static final float HALO_R_OUT  = 0.24f;  // outer radius
-    private static final float HALO_THICK  = 0.012f; // tiny top/bottom offset so both faces show
-    private static final int   HALO_SEG    = 40;     // smoothness
-    // Warm gold, RGBA 0-1. Alpha controls glow intensity (additive blend).
-    private static final float HALO_R = 1.00f, HALO_G = 0.80f, HALO_B = 0.32f, HALO_A = 0.85f;
+    // ---- Radiant aura tunables ----
+    private static final float GLOW_Y      = 0.45f;  // height of the glow's center (blocks above feet)
+    private static final float GLOW_RADIUS = 0.60f;  // how far the light reaches out
+    private static final int   GLOW_SEG    = 32;     // smoothness of the disc
+    // Warm gold, RGB 0-1. Core alpha = brightness at center; edges fade to 0 (feathered).
+    private static final float GLOW_R = 1.00f, GLOW_G = 0.80f, GLOW_B = 0.35f;
+    private static final float GLOW_CORE_ALPHA = 0.45f;
 
     public BufoRenderer(EntityRendererProvider.Context context) {
         super(context, new BufoModel(context.bakeLayer(ModelLayers.VILLAGER)), 0.3f);
@@ -44,47 +43,44 @@ public class BufoRenderer extends MobRenderer<BufoEntity, BufoModel> {
     public void render(BufoEntity entity, float yaw, float partialTick, PoseStack pose,
                        MultiBufferSource buffers, int packedLight) {
         super.render(entity, yaw, partialTick, pose, buffers, packedLight);
-        renderHalo(entity, partialTick, pose, buffers);
+        renderGlow(entity, partialTick, pose, buffers);
     }
 
-    /** A flat, glowing golden ring hovering above Bufo's head (drawn in world/entity space). */
-    private void renderHalo(BufoEntity entity, float partialTick, PoseStack pose, MultiBufferSource buffers) {
+    /** A soft, camera-facing radiant glow emanating from Bufo's body (bright core, feathered edge). */
+    private void renderGlow(BufoEntity entity, float partialTick, PoseStack pose, MultiBufferSource buffers) {
         pose.pushPose();
-        // Gentle bob for a little life.
-        float bob = Mth.sin((entity.tickCount + partialTick) * 0.08f) * 0.03f;
-        pose.translate(0.0F, HALO_Y + bob, 0.0F);
+        pose.translate(0.0F, GLOW_Y, 0.0F);
+        // Billboard: face the camera so it reads as radiance, not a flat ring.
+        pose.mulPose(this.entityRenderDispatcher.cameraOrientation());
 
         Matrix4f m = pose.last().pose();
         VertexConsumer vc = buffers.getBuffer(RenderType.lightning());
 
-        for (int i = 0; i < HALO_SEG; i++) {
-            double t0 = (Math.PI * 2.0) * i / HALO_SEG;
-            double t1 = (Math.PI * 2.0) * (i + 1) / HALO_SEG;
-            float c0 = (float) Math.cos(t0), s0 = (float) Math.sin(t0);
-            float c1 = (float) Math.cos(t1), s1 = (float) Math.sin(t1);
+        // Gentle breathing pulse.
+        float pulse = 0.82f + 0.18f * Mth.sin((entity.tickCount + partialTick) * 0.10f);
+        float coreA = GLOW_CORE_ALPHA * pulse;
 
-            float ix0 = HALO_R_IN * c0,  iz0 = HALO_R_IN * s0;
-            float ox0 = HALO_R_OUT * c0, oz0 = HALO_R_OUT * s0;
-            float ix1 = HALO_R_IN * c1,  iz1 = HALO_R_IN * s1;
-            float ox1 = HALO_R_OUT * c1, oz1 = HALO_R_OUT * s1;
+        for (int i = 0; i < GLOW_SEG; i++) {
+            double t0 = (Math.PI * 2.0) * i / GLOW_SEG;
+            double t1 = (Math.PI * 2.0) * (i + 1) / GLOW_SEG;
+            float x0 = (float) Math.cos(t0) * GLOW_RADIUS, y0 = (float) Math.sin(t0) * GLOW_RADIUS;
+            float x1 = (float) Math.cos(t1) * GLOW_RADIUS, y1 = (float) Math.sin(t1) * GLOW_RADIUS;
 
-            // Top face (visible from above)
-            v(vc, m, ix0, HALO_THICK, iz0);
-            v(vc, m, ox0, HALO_THICK, oz0);
-            v(vc, m, ox1, HALO_THICK, oz1);
-            v(vc, m, ix1, HALO_THICK, iz1);
-
-            // Bottom face (reverse winding, visible from below)
-            v(vc, m, ix1, -HALO_THICK, iz1);
-            v(vc, m, ox1, -HALO_THICK, oz1);
-            v(vc, m, ox0, -HALO_THICK, oz0);
-            v(vc, m, ix0, -HALO_THICK, iz0);
+            // Each wedge is a "quad" with a doubled center vertex (renders as a triangle).
+            // Front face:
+            core(vc, m, coreA); edge(vc, m, x0, y0); edge(vc, m, x1, y1); core(vc, m, coreA);
+            // Back face (reversed) so it shows from any angle:
+            core(vc, m, coreA); edge(vc, m, x1, y1); edge(vc, m, x0, y0); core(vc, m, coreA);
         }
         pose.popPose();
     }
 
-    private static void v(VertexConsumer vc, Matrix4f m, float x, float y, float z) {
-        vc.vertex(m, x, y, z).color(HALO_R, HALO_G, HALO_B, HALO_A).endVertex();
+    private static void core(VertexConsumer vc, Matrix4f m, float alpha) {
+        vc.vertex(m, 0.0F, 0.0F, 0.0F).color(GLOW_R, GLOW_G, GLOW_B, alpha).endVertex();
+    }
+
+    private static void edge(VertexConsumer vc, Matrix4f m, float x, float y) {
+        vc.vertex(m, x, y, 0.0F).color(GLOW_R, GLOW_G, GLOW_B, 0.0F).endVertex(); // transparent rim = feathered
     }
 
     @Override
