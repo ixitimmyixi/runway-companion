@@ -16,7 +16,7 @@ import java.util.Set;
 
 /**
  * Runway text-to-speech. Preset voices use eleven_multilingual_v2; a custom
- * voice is spoken via seed_audio, cloning a <=30s reference clip.
+ * voice is spoken via seed_audio, cloning that voice's own preview clip.
  */
 public final class RunwayTts {
     private static final HttpClient HTTP = HttpClient.newBuilder()
@@ -33,6 +33,11 @@ public final class RunwayTts {
         "Maggie","Jack","Katie","Noah","James","Rina","Ella","Mariah","Frank","Claudia",
         "Niki","Vincent","Kendrick","Myrna","Tom","Wanda","Benjamin","Kiana","Rachel");
 
+    // Custom-voice reference clips are expensive to build (download + decode + base64),
+    // and identical for a given voice, so we build once and reuse.
+    private static volatile String cachedVoice;
+    private static volatile String cachedRefUri;
+
     private RunwayTts() {}
 
     public static byte[] synthesize(String text) throws Exception {
@@ -42,26 +47,18 @@ public final class RunwayTts {
         body.addProperty("promptText", text);
 
         if (PRESETS.contains(v)) {
+            // Preset path.
             body.addProperty("model", "eleven_multilingual_v2");
             JsonObject voice = new JsonObject();
             voice.addProperty("type", "runway-preset");
             voice.addProperty("presetId", v);
             body.add("voice", voice);
         } else {
+            // Custom voice path: clone the voice's preview clip via seed_audio.
             // seed_audio requires a reference clip of AT MOST 30 seconds. If the user hosts
             // their own short clip we use it directly; otherwise we download the voice's
             // preview and trim it to <30s inline (as a data: URI) so nothing needs hosting.
-            String audioUri;
-            if (CompanionConfig.ttsReferenceUrl != null && !CompanionConfig.ttsReferenceUrl.isBlank()) {
-                audioUri = CompanionConfig.ttsReferenceUrl.trim();
-            } else {
-                String previewUrl = VoicesClient.previewUrlFor(v);
-                if (previewUrl == null || previewUrl.isBlank()) {
-                    throw new RuntimeException("No preview clip found for custom voice \"" + v + "\". Make sure it's "
-                        + "READY on your Runway account, set ttsReferenceUrl to a <=30s clip, or pick a preset voice.");
-                }
-                audioUri = ReferenceClip.dataUriFromPreview(previewUrl);
-            }
+            String audioUri = referenceFor(v);
             body.addProperty("model", "seed_audio");
             JsonObject voice = new JsonObject();
             voice.addProperty("type", "reference-audio");
@@ -88,8 +85,10 @@ public final class RunwayTts {
 
         String outputUrl = null;
         long deadline = System.currentTimeMillis() + 60_000;
+        boolean firstPoll = true;
         while (System.currentTimeMillis() < deadline) {
-            Thread.sleep(1000);
+            Thread.sleep(firstPoll ? 300 : 500);
+            firstPoll = false;
             HttpRequest poll = HttpRequest.newBuilder()
                 .uri(URI.create(BASE + "/v1/tasks/" + taskId))
                 .timeout(Duration.ofSeconds(30))
@@ -121,5 +120,31 @@ public final class RunwayTts {
             in.transferTo(out);
             return out.toByteArray();
         }
+    }
+
+    /** Resolve the seed_audio reference clip for a custom voice, building+caching it once. */
+    private static String referenceFor(String v) throws Exception {
+        if (CompanionConfig.ttsReferenceUrl != null && !CompanionConfig.ttsReferenceUrl.isBlank())
+            return CompanionConfig.ttsReferenceUrl.trim();
+
+        if (v.equals(cachedVoice) && cachedRefUri != null) return cachedRefUri;
+
+        String previewUrl = VoicesClient.previewUrlFor(v);
+        if (previewUrl == null || previewUrl.isBlank()) {
+            throw new RuntimeException("No preview clip found for custom voice \"" + v + "\". Make sure it's "
+                + "READY on your Runway account, set ttsReferenceUrl to a <=30s clip, or pick a preset voice.");
+        }
+        String uri = ReferenceClip.dataUriFromPreview(previewUrl);
+        cachedVoice = v;
+        cachedRefUri = uri;
+        return uri;
+    }
+
+    /** Optionally pre-build the reference off the game thread so the first line isn't slow. */
+    public static void prewarm() {
+        try {
+            String v = CompanionConfig.ttsVoice == null ? "" : CompanionConfig.ttsVoice.trim();
+            if (!PRESETS.contains(v)) referenceFor(v);
+        } catch (Exception ignored) {}
     }
 }
