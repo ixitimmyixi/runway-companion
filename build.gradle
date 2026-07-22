@@ -1,0 +1,52 @@
+plugins {
+    id 'eclipse'
+    id 'net.minecraftforge.gradle' version '[6.0,6.2)'
+    id 'com.github.johnrengelman.shadow' version '8.1.1'
+}
+
+version = '0.1.0'
+group = 'com.example.companion'
+base { archivesName = 'runway-companion' }
+
+java.toolchain.languageVersion = JavaLanguageVersion.of(17)
+
+minecraft {
+    mappings channel: 'official', version: '1.20.1'
+    runs {
+        client {
+            workingDirectory project.file('run')
+            mods { companion { source sourceSets.main } }
+        }
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+// Libraries in 'shade' get packed into the mod jar.
+configurations {
+    shade
+    implementation.extendsFrom shade
+}
+
+dependencies {
+    minecraft 'net.minecraftforge:forge:1.20.1-47.3.0'
+    shade 'com.googlecode.soundlibs:jlayer:1.0.1.4'
+}
+
+// Pack JLayer into the jar (relocated to avoid clashes), then reobfuscate it.
+shadowJar {
+    configurations = [project.configurations.shade]
+    archiveClassifier = ''
+    relocate 'javazoom', 'com.example.companion.libs.javazoom'
+    finalizedBy 'reobfShadowJar'
+}
+
+reobf {
+    shadowJar {}
+}
+
+// The shaded jar is the real artifact; the plain jar becomes "-slim".
+jar { archiveClassifier = 'slim' }
+assemble.dependsOn shadowJar
