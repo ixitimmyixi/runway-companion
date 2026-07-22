@@ -1,5 +1,6 @@
 package com.example.companion;
 
+import com.example.companion.ai.RunwayTts;
 import com.example.companion.client.ConfigScreen;
 
 import net.minecraftforge.client.ConfigScreenHandler;
@@ -20,7 +21,10 @@ public class CompanionMod {
     }
 
     private void clientSetup(final FMLClientSetupEvent event) {
-        event.enqueueWork(CompanionConfig::load);
+        event.enqueueWork(() -> {
+            CompanionConfig.load();
+            RunwayTts.prewarm(); // build/upload custom-voice reference ahead of first line
+        });
 
         // Adds the "Config" button to this mod's entry in the Mods list.
         ModLoadingContext.get().registerExtensionPoint(
