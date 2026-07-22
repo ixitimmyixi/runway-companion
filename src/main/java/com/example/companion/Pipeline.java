@@ -14,7 +14,6 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
 import java.util.List;
-import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.regex.Matcher;
@@ -41,31 +40,10 @@ public final class Pipeline {
     private static final Pattern SEARCH_TAG =
         Pattern.compile("<search>\\s*([^<]+?)\\s*</search>", Pattern.CASE_INSENSITIVE);
 
-    // Command roots that change the world irreversibly -> require confirmation first.
-    private static final Set<String> DESTRUCTIVE = Set.of(
-        "fill", "clone", "kill", "execute", "place", "forceload", "datapack", "structure", "clear", "setblock");
-
-    // A destructive command waiting on the player's yes/no.
-    private static String pendingCommand;
-    private static String pendingRequest;
-
     private Pipeline() {}
 
     public static void handle(String userText) {
         if (userText == null || userText.isBlank()) return;
-
-        // If a destructive command is awaiting confirmation, treat this message as the answer.
-        String pendCmd, pendReq;
-        synchronized (HISTORY) { pendCmd = pendingCommand; pendReq = pendingRequest; }
-        if (pendCmd != null) {
-            synchronized (HISTORY) { pendingCommand = null; pendingRequest = null; }
-            if (isAffirmative(userText)) {
-                POOL.submit(() -> runAndSpeak(pendReq, pendCmd));
-                return;
-            }
-            echo("\u00A77(cancelled)");
-            // not a yes -> fall through and answer the new message normally
-        }
 
         String context = GameContext.snapshot();
         List<Turn> priorTurns;
@@ -103,12 +81,6 @@ public final class Pipeline {
         try {
             String cmd = command.strip();
             if (cmd.startsWith("/")) cmd = cmd.substring(1);
-            if (isDestructive(cmd)) {
-                synchronized (HISTORY) { pendingCommand = cmd; pendingRequest = userText; }
-                speak("That would change your world and can't be undone \u2014 want me to run \u00A7f/"
-                    + cmd + "\u00A7r? Say yes to confirm.");
-                return;
-            }
             runAndSpeak(userText, cmd);
         } catch (Exception e) {
             echo("(companion error: " + e.getMessage() + ")");
@@ -159,19 +131,6 @@ public final class Pipeline {
         }
     }
 
-    private static boolean isDestructive(String cmd) {
-        String root = cmd.trim().toLowerCase().split("\\s+")[0];
-        return DESTRUCTIVE.contains(root);
-    }
-
-    private static boolean isAffirmative(String s) {
-        String t = s.trim().toLowerCase();
-        return t.equals("yes") || t.equals("y") || t.equals("yeah") || t.equals("yep") || t.equals("yup")
-            || t.equals("sure") || t.equals("ok") || t.equals("okay") || t.equals("confirm")
-            || t.startsWith("yes") || t.startsWith("do it") || t.startsWith("go ahead")
-            || t.startsWith("please do") || t.contains("go for it");
-    }
-
     /** Record, echo, synthesize and play a spoken reply. */
     private static void speak(String text) throws Exception {
         synchronized (HISTORY) { record(new Turn("assistant", text)); }
@@ -191,7 +150,7 @@ public final class Pipeline {
 
     /** Clear conversation memory. */
     public static void clearHistory() {
-        synchronized (HISTORY) { HISTORY.clear(); pendingCommand = null; pendingRequest = null; }
+        synchronized (HISTORY) { HISTORY.clear(); }
     }
 
     public static void echo(String text) {
