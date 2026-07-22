@@ -23,9 +23,23 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
 
-/** Plays TTS audio. Decodes MP3 with JLayer; plays WAV/etc. via javax.sound. */
+/** Plays TTS audio one clip at a time (queued). Decodes MP3 with JLayer. */
 public final class AudioPlayer {
+    // Clips are queued and played by a single worker so they never overlap.
+    private static final BlockingQueue<byte[]> QUEUE = new LinkedBlockingQueue<>();
+    private static volatile SourceDataLine currentLine;
+    private static volatile Clip currentClip;
+    private static volatile boolean stopFlag;
+
+    static {
+        Thread worker = new Thread(AudioPlayer::runLoop, "companion-audio");
+        worker.setDaemon(true);
+        worker.start();
+    }
+
     private AudioPlayer() {}
 
     /** Names of output devices that can play back audio (for the config picker). */
@@ -42,9 +56,27 @@ public final class AudioPlayer {
         return names;
     }
 
+    /** Queue a clip for playback. */
     public static void play(byte[] audio) {
         if (audio == null || audio.length == 0) { Pipeline.echo("\u00A77(audio: 0 bytes)"); return; }
-        new Thread(() -> {
+        QUEUE.offer(audio);
+    }
+
+    /** Stop whatever is playing now and drop anything queued (e.g. the player starts talking). */
+    public static void stop() {
+        QUEUE.clear();
+        stopFlag = true;
+        SourceDataLine l = currentLine;
+        if (l != null) { try { l.stop(); l.flush(); } catch (Exception ignored) {} }
+        Clip c = currentClip;
+        if (c != null) { try { c.stop(); c.flush(); } catch (Exception ignored) {} }
+    }
+
+    private static void runLoop() {
+        while (true) {
+            byte[] audio;
+            try { audio = QUEUE.take(); } catch (InterruptedException e) { continue; }
+            stopFlag = false;
             try {
                 BufoSpeakingState.start();
                 if (isMp3(audio)) playMp3(audio);
@@ -54,7 +86,7 @@ public final class AudioPlayer {
             } finally {
                 BufoSpeakingState.stop();
             }
-        }, "companion-audio").start();
+        }
     }
 
     private static boolean isMp3(byte[] a) {
@@ -82,22 +114,39 @@ public final class AudioPlayer {
         byte[] data = pcm.toByteArray();
         AudioFormat fmt = new AudioFormat(sampleRate, 16, channels, true, false);
         SourceDataLine line = openSourceLine(fmt);
-        applyVolume(line, CompanionConfig.ttsVolume);
-        line.start();
-        line.write(data, 0, data.length);
-        line.drain();
-        line.close();
+        currentLine = line;
+        try {
+            applyVolume(line, CompanionConfig.ttsVolume);
+            line.start();
+            int off = 0;
+            while (off < data.length && !stopFlag) {
+                int len = Math.min(8192, data.length - off);
+                int wrote = line.write(data, off, len);
+                if (wrote <= 0) break;
+                off += wrote;
+            }
+            if (!stopFlag) line.drain();
+        } finally {
+            try { line.stop(); line.close(); } catch (Exception ignored) {}
+            currentLine = null;
+        }
     }
 
     private static void playOther(byte[] audio) throws Exception {
         try (AudioInputStream in = AudioSystem.getAudioInputStream(
                 new BufferedInputStream(new ByteArrayInputStream(audio)))) {
             Clip clip = openClip(in.getFormat());
-            clip.open(in);
-            applyVolume(clip, CompanionConfig.ttsVolume);
-            clip.start();
-            Thread.sleep(clip.getMicrosecondLength() / 1000 + 200);
-            clip.close();
+            currentClip = clip;
+            try {
+                clip.open(in);
+                applyVolume(clip, CompanionConfig.ttsVolume);
+                clip.start();
+                long end = System.currentTimeMillis() + clip.getMicrosecondLength() / 1000 + 200;
+                while (System.currentTimeMillis() < end && !stopFlag && clip.isRunning()) Thread.sleep(20);
+            } finally {
+                try { clip.stop(); clip.close(); } catch (Exception ignored) {}
+                currentClip = null;
+            }
         }
     }
 
