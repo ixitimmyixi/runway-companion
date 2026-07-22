@@ -15,20 +15,25 @@ import java.time.Duration;
 import java.util.Base64;
 
 /**
- * Turns a voice's (possibly long) preview clip into a short mono WAV data URI
- * usable as a seed_audio reference, which must be at most 30 seconds. We decode
- * the MP3 with JLayer, keep the first {@link #MAX_SECONDS}, downmix to mono and
- * optionally halve the rate to keep the inline payload small.
+ * Turns a voice's (possibly long) preview clip into a short mono WAV usable as a
+ * seed_audio reference (which must be at most 30 seconds). We decode the MP3 with
+ * JLayer, keep the first {@link #MAX_SECONDS}, downmix to mono and halve the rate
+ * to keep the payload small.
  */
 public final class ReferenceClip {
     private static final HttpClient HTTP = HttpClient.newBuilder()
         .connectTimeout(Duration.ofSeconds(10)).build();
 
-    private static final double MAX_SECONDS = 24.0; // safely under the 30s cap
+    private static final double MAX_SECONDS = 12.0; // well under the 30s cap; smaller payload
 
     private ReferenceClip() {}
 
     public static String dataUriFromPreview(String previewUrl) throws Exception {
+        return "data:audio/wav;base64," + Base64.getEncoder().encodeToString(wavFromPreview(previewUrl));
+    }
+
+    /** Download the preview and return a small mono WAV clip (first {@link #MAX_SECONDS}). */
+    public static byte[] wavFromPreview(String previewUrl) throws Exception {
         byte[] mp3 = download(previewUrl);
 
         Bitstream bitstream = new Bitstream(new ByteArrayInputStream(mp3));
@@ -65,8 +70,7 @@ public final class ReferenceClip {
 
         byte[] pcm = monoPcm.toByteArray();
         if (sampleRate > 24000) { pcm = halve(pcm); sampleRate /= 2; }
-        byte[] wav = wrapWav(pcm, sampleRate, 1);
-        return "data:audio/wav;base64," + Base64.getEncoder().encodeToString(wav);
+        return wrapWav(pcm, sampleRate, 1);
     }
 
     private static byte[] download(String url) throws Exception {
