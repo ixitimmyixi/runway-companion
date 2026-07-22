@@ -2,6 +2,7 @@ package com.example.companion.client;
 
 import com.example.companion.CompanionConfig;
 import com.example.companion.ai.VoicesClient;
+import com.example.companion.ai.RunwayTts;
 import com.example.companion.audio.MicCapture;
 
 import net.minecraft.client.Minecraft;
@@ -206,7 +207,7 @@ public class ConfigScreen extends Screen {
 
     private void switchPage(int p) { captureInto(); page = p; status = ""; rebuildWidgets(); }
 
-    private void save() { captureInto(); CompanionConfig.save(); onClose(); }
+    private void save() { captureInto(); CompanionConfig.save(); RunwayTts.prewarm(); onClose(); }
 
     private void fetchVoices() {
         captureInto();
