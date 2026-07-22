@@ -14,7 +14,6 @@ import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.Set;
 
-/** Runway text-to-speech (eleven_multilingual_v2): preset voices only. */
 public final class RunwayTts {
     private static final HttpClient HTTP = HttpClient.newBuilder()
         .connectTimeout(Duration.ofSeconds(10)).build();
@@ -22,7 +21,6 @@ public final class RunwayTts {
     private static final String BASE = "https://api.dev.runwayml.com";
     private static final String VERSION = "2024-11-06";
 
-    // The only voices Runway's TTS endpoint accepts for this model.
     private static final Set<String> PRESETS = Set.of(
         "Maya","Arjun","Serene","Bernard","Billy","Mark","Clint","Mabel","Chad","Leslie",
         "Eleanor","Elias","Elliot","Grungle","Brodie","Sandra","Kirk","Kylie","Lara","Lisa",
@@ -34,20 +32,30 @@ public final class RunwayTts {
 
     public static byte[] synthesize(String text) throws Exception {
         String v = CompanionConfig.ttsVoice == null ? "" : CompanionConfig.ttsVoice.trim();
-        if (!PRESETS.contains(v)) {
-            throw new RuntimeException("\"" + v + "\" isn't a Runway preset. Runway's text-to-speech "
-                + "only supports preset voices (Maya, Vincent, Rachel, ...); custom/trained voices "
-                + "aren't available through this API. Pick a preset in the config.");
-        }
-
-        JsonObject voice = new JsonObject();
-        voice.addProperty("type", "runway-preset");
-        voice.addProperty("presetId", v);
 
         JsonObject body = new JsonObject();
-        body.addProperty("model", CompanionConfig.ttsModel);
         body.addProperty("promptText", text);
-        body.add("voice", voice);
+
+        if (PRESETS.contains(v)) {
+            body.addProperty("model", "eleven_multilingual_v2");
+            JsonObject voice = new JsonObject();
+            voice.addProperty("type", "runway-preset");
+            voice.addProperty("presetId", v);
+            body.add("voice", voice);
+        } else {
+            String previewUrl = VoicesClient.previewUrlFor(v);
+            if (previewUrl == null || previewUrl.isBlank()) {
+                throw new RuntimeException("Couldn't find a preview clip for custom voice \"" + v + "\". "
+                    + "Custom voices are spoken by cloning their preview clip \u2014 make sure the voice exists "
+                    + "and is READY on your Runway account, or pick a preset voice in the config.");
+            }
+            body.addProperty("model", "seed_audio");
+            JsonObject voice = new JsonObject();
+            voice.addProperty("type", "reference-audio");
+            voice.addProperty("audioUri", previewUrl);
+            body.add("voice", voice);
+            body.addProperty("outputFormat", "mp3");
+        }
 
         HttpRequest create = HttpRequest.newBuilder()
             .uri(URI.create(BASE + "/v1/text_to_speech"))
