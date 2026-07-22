@@ -1,8 +1,8 @@
 package com.example.companion.client;
 
 import com.example.companion.CompanionConfig;
-import com.example.companion.ai.VoicesClient;
 import com.example.companion.ai.RunwayTts;
+import com.example.companion.ai.VoicesClient;
 import com.example.companion.audio.MicCapture;
 
 import net.minecraft.client.Minecraft;
@@ -11,6 +11,7 @@ import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.CycleButton;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
 import net.minecraftforge.client.gui.widget.ForgeSlider;
 
@@ -29,6 +30,7 @@ public class ConfigScreen extends Screen {
 
     private final Screen parent;
     private int page = 0;
+    private int customVoiceWarnY = -1;
 
     private final Map<String, EditBox> boxes = new LinkedHashMap<>();
     private ForgeSlider volumeSlider;
@@ -59,6 +61,7 @@ public class ConfigScreen extends Screen {
     @Override
     protected void init() {
         boxes.clear();
+        customVoiceWarnY = -1;
         volumeSlider = null;
         int labelW = 95, boxW = 200;
         int boxX = this.width / 2 - (labelW + boxW) / 2 + labelW;
@@ -105,6 +108,8 @@ public class ConfigScreen extends Screen {
             addRenderableWidget(Button.builder(Component.literal("Fetch my custom voices"), b -> fetchVoices())
                 .bounds(boxX, y, boxW, 18).build());
             y += step + 4;
+            customVoiceWarnY = y;   // red warning drawn here in render()
+            y += 36;                // reserve room for the 3-line warning
         } else {
             List<String> devices = new ArrayList<>();
             devices.add("(system default)");
@@ -236,6 +241,21 @@ public class ConfigScreen extends Screen {
         for (Map.Entry<String, EditBox> e : boxes.entrySet())
             g.drawString(this.font, e.getKey(), labelX, e.getValue().getY() + 4, 0xC0C0C0);
         super.render(g, mouseX, mouseY, partialTick);
+        if (page == 1 && customVoiceWarnY >= 0) {
+            int cx = this.width / 2;
+            g.drawCenteredString(this.font,
+                Component.literal("\u26A0 Custom voices respond MUCH slower")
+                    .withStyle(ChatFormatting.RED, ChatFormatting.BOLD),
+                cx, customVoiceWarnY, 0xFFFF5555);
+            g.drawCenteredString(this.font,
+                Component.literal("Preset voices are far faster. Expect noticeably longer")
+                    .withStyle(ChatFormatting.RED),
+                cx, customVoiceWarnY + 12, 0xFFFF5555);
+            g.drawCenteredString(this.font,
+                Component.literal("waits for each reply when a (custom) voice is selected.")
+                    .withStyle(ChatFormatting.RED),
+                cx, customVoiceWarnY + 23, 0xFFFF5555);
+        }
         if (page == 1 && !status.isEmpty())
             g.drawCenteredString(this.font, Component.literal(status), this.width / 2, this.height - 8, 0xA0A0A0);
     }
