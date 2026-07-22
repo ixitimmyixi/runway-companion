@@ -54,7 +54,7 @@ public class BufoRenderer extends MobRenderer<BufoEntity, BufoModel> {
         pose.mulPose(this.entityRenderDispatcher.cameraOrientation());
 
         Matrix4f m = pose.last().pose();
-        VertexConsumer vc = buffers.getBuffer(RenderType.lightning());
+        VertexConsumer vc = buffers.getBuffer(BufoRenderTypes.GLOW);
 
         // Gentle breathing pulse.
         float pulse = 0.82f + 0.18f * Mth.sin((entity.tickCount + partialTick) * 0.10f);
