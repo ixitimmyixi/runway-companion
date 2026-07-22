@@ -12,6 +12,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
+import java.util.Base64;
 import java.util.Set;
 
 /**
@@ -33,10 +34,14 @@ public final class RunwayTts {
         "Maggie","Jack","Katie","Noah","James","Rina","Ella","Mariah","Frank","Claudia",
         "Niki","Vincent","Kendrick","Myrna","Tom","Wanda","Benjamin","Kiana","Rachel");
 
-    // Custom-voice reference clips are expensive to build (download + decode + base64),
-    // and identical for a given voice, so we build once and reuse.
+    // Custom-voice references are expensive to build (download + decode + upload) and
+    // identical for a given voice, so we build the clip once, upload it once, and reuse
+    // the tiny runway:// URI. Ephemeral URIs live ~24h, so we refresh before then.
+    private static final long UPLOAD_TTL_MS = 23L * 60 * 60 * 1000;
     private static volatile String cachedVoice;
-    private static volatile String cachedRefUri;
+    private static volatile byte[] cachedWav;
+    private static volatile String cachedUri;   // runway:// (preferred) or data: fallback
+    private static volatile long   cachedUriAt;
 
     private RunwayTts() {}
 
@@ -54,10 +59,8 @@ public final class RunwayTts {
             voice.addProperty("presetId", v);
             body.add("voice", voice);
         } else {
-            // Custom voice path: clone the voice's preview clip via seed_audio.
-            // seed_audio requires a reference clip of AT MOST 30 seconds. If the user hosts
-            // their own short clip we use it directly; otherwise we download the voice's
-            // preview and trim it to <30s inline (as a data: URI) so nothing needs hosting.
+            // Custom voice path via seed_audio. The reference clip must be <=30s; we build
+            // it from the voice's preview, upload it once, and reuse a tiny runway:// URI.
             String audioUri = referenceFor(v);
             body.addProperty("model", "seed_audio");
             JsonObject voice = new JsonObject();
@@ -122,29 +125,46 @@ public final class RunwayTts {
         }
     }
 
-    /** Resolve the seed_audio reference clip for a custom voice, building+caching it once. */
-    private static String referenceFor(String v) throws Exception {
+    /** Resolve the seed_audio reference for a custom voice: build clip once, upload once, reuse. */
+    private static synchronized String referenceFor(String v) throws Exception {
         if (CompanionConfig.ttsReferenceUrl != null && !CompanionConfig.ttsReferenceUrl.isBlank())
             return CompanionConfig.ttsReferenceUrl.trim();
 
-        if (v.equals(cachedVoice) && cachedRefUri != null) return cachedRefUri;
-
-        String previewUrl = VoicesClient.previewUrlFor(v);
-        if (previewUrl == null || previewUrl.isBlank()) {
-            throw new RuntimeException("No preview clip found for custom voice \"" + v + "\". Make sure it's "
-                + "READY on your Runway account, set ttsReferenceUrl to a <=30s clip, or pick a preset voice.");
+        // Rebuild the trimmed clip only when the selected voice changes.
+        if (!v.equals(cachedVoice) || cachedWav == null) {
+            String previewUrl = VoicesClient.previewUrlFor(v);
+            if (previewUrl == null || previewUrl.isBlank()) {
+                throw new RuntimeException("No preview clip found for custom voice \"" + v + "\". Make sure it's "
+                    + "READY on your Runway account, set ttsReferenceUrl to a <=30s clip, or pick a preset voice.");
+            }
+            cachedWav = ReferenceClip.wavFromPreview(previewUrl);
+            cachedVoice = v;
+            cachedUri = null; // force a fresh upload for the new voice
         }
-        String uri = ReferenceClip.dataUriFromPreview(previewUrl);
-        cachedVoice = v;
-        cachedRefUri = uri;
-        return uri;
+
+        // Reuse a still-valid uploaded URI; otherwise upload once and cache it.
+        long now = System.currentTimeMillis();
+        boolean fresh = cachedUri != null && cachedUri.startsWith("runway://") && (now - cachedUriAt) < UPLOAD_TTL_MS;
+        if (!fresh) {
+            try {
+                cachedUri = RunwayUploads.uploadEphemeral(cachedWav, "bufo-ref.wav");
+                cachedUriAt = now;
+            } catch (Exception uploadFailed) {
+                // Fall back to inline data URI so playback still works, just heavier per call.
+                cachedUri = "data:audio/wav;base64," + Base64.getEncoder().encodeToString(cachedWav);
+                cachedUriAt = now;
+            }
+        }
+        return cachedUri;
     }
 
-    /** Optionally pre-build the reference off the game thread so the first line isn't slow. */
+    /** Pre-build + upload the reference off the game thread so the first line isn't slow. */
     public static void prewarm() {
-        try {
-            String v = CompanionConfig.ttsVoice == null ? "" : CompanionConfig.ttsVoice.trim();
-            if (!PRESETS.contains(v)) referenceFor(v);
-        } catch (Exception ignored) {}
+        new Thread(() -> {
+            try {
+                String v = CompanionConfig.ttsVoice == null ? "" : CompanionConfig.ttsVoice.trim();
+                if (!PRESETS.contains(v)) referenceFor(v);
+            } catch (Exception ignored) {}
+        }, "companion-tts-prewarm").start();
     }
 }
