@@ -148,6 +148,20 @@ public final class Pipeline {
         while (HISTORY.size() > MAX_TURNS) HISTORY.removeFirst();
     }
 
+    /** Bufo says something on his own (not a reply to the player) — chat + spoken. */
+    public static void announce(String text) {
+        if (text == null || text.isBlank()) return;
+        synchronized (HISTORY) { record(new Turn("assistant", text)); }
+        echo(text);
+        POOL.submit(() -> {
+            try {
+                AudioPlayer.play(RunwayTts.synthesize(text));
+            } catch (Exception e) {
+                echo("(companion error: " + e.getMessage() + ")");
+            }
+        });
+    }
+
     /** Clear conversation memory. */
     public static void clearHistory() {
         synchronized (HISTORY) { HISTORY.clear(); }
