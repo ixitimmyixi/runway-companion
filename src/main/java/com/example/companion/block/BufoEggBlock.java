@@ -39,8 +39,10 @@ public class BufoEggBlock extends Block {
     private void hatch(ServerLevel level, BlockPos pos, Player player) {
         double cx = pos.getX() + 0.5, cy = pos.getY() + 0.5, cz = pos.getZ() + 0.5;
 
+        // The egg is consumed.
         level.removeBlock(pos, false);
 
+        // Epic, End-themed hatch burst.
         level.sendParticles(ParticleTypes.FLASH,            cx, cy, cz, 1, 0, 0, 0, 0);
         level.sendParticles(ParticleTypes.EXPLOSION_EMITTER, cx, cy, cz, 1, 0, 0, 0, 0);
         level.sendParticles(ParticleTypes.END_ROD,          cx, cy, cz, 140, 0.4, 0.6, 0.4, 0.09);
@@ -49,6 +51,7 @@ public class BufoEggBlock extends Block {
         level.playSound(null, pos, SoundEvents.END_PORTAL_SPAWN, SoundSource.BLOCKS, 1.0f, 1.0f);
         level.playSound(null, pos, SoundEvents.ENDER_DRAGON_GROWL, SoundSource.HOSTILE, 1.0f, 1.0f);
 
+        // Bring Bufo into the world, facing the player.
         BufoEntity bufo = ModRegistry.BUFO.get().create(level);
         if (bufo != null) {
             float yaw = player != null ? (float) faceYaw(cx, cz, player.getX(), player.getZ()) : 0f;
@@ -56,6 +59,7 @@ public class BufoEggBlock extends Block {
             level.addFreshEntity(bufo);
         }
 
+        // Bufo introduces himself (spoken + in chat).
         Pipeline.announce("So\u2026 you've found me. I am Bufo. I have watched over this world since its first "
             + "sunrise, long before your kind walked it. Something about you caught my eye \u2014 so I'll walk with "
             + "you a while. Call on me whenever you like.");
@@ -68,6 +72,6 @@ public class BufoEggBlock extends Block {
 
     @Override
     public List<ItemStack> getDrops(BlockState state, LootParams.Builder params) {
-        return Collections.emptyList();
+        return Collections.emptyList(); // never drops; it's consumed by hatching
     }
 }
