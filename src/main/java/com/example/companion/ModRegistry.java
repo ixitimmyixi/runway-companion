@@ -1,11 +1,16 @@
 package com.example.companion;
 
+import com.example.companion.block.BufoEggBlock;
 import com.example.companion.entity.BufoEntity;
 
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.MobCategory;
+import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.CreativeModeTabs;
 import net.minecraft.world.item.Item;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.SoundType;
+import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraftforge.common.ForgeSpawnEggItem;
 import net.minecraftforge.event.BuildCreativeModeTabContentsEvent;
 import net.minecraftforge.event.entity.EntityAttributeCreationEvent;
@@ -17,8 +22,8 @@ import net.minecraftforge.registries.ForgeRegistries;
 import net.minecraftforge.registries.RegistryObject;
 
 /**
- * Registers Bufo the companion entity and its spawn egg, and wires up the
- * mod-bus events for attributes and the creative spawn-egg tab.
+ * Registers Bufo the companion entity, its spawn egg, and the hatchable Bufo egg
+ * block, and wires up the mod-bus events for attributes and creative tabs.
  */
 @Mod.EventBusSubscriber(modid = CompanionMod.MODID, bus = Mod.EventBusSubscriber.Bus.MOD)
 public final class ModRegistry {
@@ -28,6 +33,8 @@ public final class ModRegistry {
         DeferredRegister.create(ForgeRegistries.ENTITY_TYPES, CompanionMod.MODID);
     public static final DeferredRegister<Item> ITEMS =
         DeferredRegister.create(ForgeRegistries.ITEMS, CompanionMod.MODID);
+    public static final DeferredRegister<Block> BLOCKS =
+        DeferredRegister.create(ForgeRegistries.BLOCKS, CompanionMod.MODID);
 
     public static final RegistryObject<EntityType<BufoEntity>> BUFO = ENTITIES.register("bufo",
         () -> EntityType.Builder.of(BufoEntity::new, MobCategory.CREATURE)
@@ -38,9 +45,20 @@ public final class ModRegistry {
     public static final RegistryObject<Item> BUFO_SPAWN_EGG = ITEMS.register("bufo_spawn_egg",
         () -> new ForgeSpawnEggItem(BUFO, 0x6a8f3c, 0xd7e894, new Item.Properties()));
 
+    // The black-and-gold egg that hatches Bufo on right-click.
+    public static final RegistryObject<Block> BUFO_EGG = BLOCKS.register("bufo_egg",
+        () -> new BufoEggBlock(BlockBehaviour.Properties.of()
+            .strength(3.0f, 9.0f)
+            .lightLevel(s -> 7)
+            .sound(SoundType.METAL)
+            .noOcclusion()));
+    public static final RegistryObject<Item> BUFO_EGG_ITEM = ITEMS.register("bufo_egg",
+        () -> new BlockItem(BUFO_EGG.get(), new Item.Properties()));
+
     /** Called from the mod constructor to attach the registers to the mod event bus. */
     public static void register(IEventBus modBus) {
         ENTITIES.register(modBus);
+        BLOCKS.register(modBus);
         ITEMS.register(modBus);
     }
 
@@ -53,6 +71,9 @@ public final class ModRegistry {
     public static void onCreativeTab(BuildCreativeModeTabContentsEvent event) {
         if (event.getTabKey() == CreativeModeTabs.SPAWN_EGGS) {
             event.accept(BUFO_SPAWN_EGG);
+        }
+        if (event.getTabKey() == CreativeModeTabs.FUNCTIONAL_BLOCKS) {
+            event.accept(BUFO_EGG_ITEM);
         }
     }
 }
