@@ -1,0 +1,7 @@
+{
+  "parent": "minecraft:block/dragon_egg",
+  "textures": {
+    "all": "companion:block/bufo_egg",
+    "particle": "companion:block/bufo_egg"
+  }
+}
