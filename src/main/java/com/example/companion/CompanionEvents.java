@@ -11,6 +11,7 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraftforge.event.entity.player.PlayerEvent;
+import net.minecraftforge.event.entity.player.PlayerInteractEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 
@@ -46,6 +47,14 @@ public final class CompanionEvents {
 
         player.displayClientMessage(Component.literal(
             "\u00A7eA strange black-and-gold egg has appeared nearby. Right-click it..."), false);
+    }
+
+    /** The Bufo egg can't be broken — only right-clicked to hatch. Cancel any left-click break. */
+    @SubscribeEvent
+    public static void onLeftClickBlock(PlayerInteractEvent.LeftClickBlock event) {
+        if (event.getLevel().getBlockState(event.getPos()).is(ModRegistry.BUFO_EGG.get())) {
+            event.setCanceled(true);
+        }
     }
 
     /** Find an open, sky-lit surface spot 6-10 blocks away with solid ground below. */
