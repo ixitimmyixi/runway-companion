@@ -48,7 +48,7 @@ public final class ModRegistry {
     // The black-and-gold egg that hatches Bufo on right-click.
     public static final RegistryObject<Block> BUFO_EGG = BLOCKS.register("bufo_egg",
         () -> new BufoEggBlock(BlockBehaviour.Properties.of()
-            .strength(3.0f, 9.0f)
+            .strength(-1.0f, 3600000.0f) // unbreakable + blast-proof (like bedrock)
             .lightLevel(s -> 7)
             .sound(SoundType.METAL)
             .noOcclusion()));
